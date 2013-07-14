@@ -581,6 +581,16 @@ class TVDBAgent(Agent.TV_Shows):
     except: pass
     
     self.readTags(series_el, metadata.genres, 'Genre')
+
+    # Cast
+    metadata.roles.clear()
+    for actor in actors_el.xpath('//Actor'):
+      try:
+        role = metadata.roles.new()
+        role.role = actor.xpath('./Role')[0].text
+        role.actor = actor.xpath('./Name')[0].text
+      except:
+        pass
     
     # Get episode data
     @parallelize
