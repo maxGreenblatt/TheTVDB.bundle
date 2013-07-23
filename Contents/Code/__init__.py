@@ -88,16 +88,16 @@ def GetResultFromNetwork(url, fetchContent=True):
         if fetchContent:
           result = result.content
 
-      except HTTPError, e:
+      except Ex.HTTPError, e:
         # Fast fail a not found.
         if e.code == 404:
           return None
 
-      except URLError, e:
+      except Ex.URLError, e:
         Log(e.reason)
         return None
 
-      except Exception, e:
+      except:
         return None
 
       if result is not None:
