@@ -240,6 +240,24 @@ class TVDBAgent(Agent.TV_Shows):
 
   def search(self, results, media, lang, manual=False):
 
+    if media.primary_agent == 'com.plexapp.agents.themoviedb':
+
+      # Get the TVDB id from the Movie Database Agent
+      tvdb_id = Core.messaging.call_external_function(
+        'com.plexapp.agents.themoviedb',
+        'MessageKit:GetTvdbId',
+        kwargs = dict(
+          tmdb_id = media.primary_metadata.id
+        )
+      )
+
+      if tvdb_id:
+        results.Append(MetadataSearchResult(
+          id = tvdb_id,
+          score = 100
+        ))
+
+
     doGoogleSearch = False
     if manual:
       doGoogleSearch = True
