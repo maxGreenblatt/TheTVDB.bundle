@@ -407,9 +407,8 @@ class TVDBAgent(Agent.TV_Shows):
         xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], id, lang)))
         if len(xml):
           self.ParseSeries(media, xml.xpath('//Series')[0], lang, results, score - scorePenalty)
-      except:
-        #somehow the tvdb id didn't work?
-        Log('thetvdb.com series xml download exception.')
+      except Exception, e:
+        Log('Couldn\'t find Series in TVDB XML: ' + str(e))
       
   def ParseSeries(self, media, el, lang, results, score):
     
