@@ -89,7 +89,7 @@ def Start():
 class TVDBAgent(Agent.TV_Shows):
   
   name = 'TheTVDB'
-  languages = [Locale.Language.English, 'fr', 'zh', 'sv', 'no', 'da', 'fi', 'nl', 'de', 'it', 'es', 'pl', 'hu', 'el', 'tr', 'ru', 'he', 'ja', 'pt', 'cs']
+  languages = [Locale.Language.English, 'fr', 'zh', 'sv', 'no', 'da', 'fi', 'nl', 'de', 'it', 'es', 'pl', 'hu', 'el', 'tr', 'ru', 'he', 'ja', 'pt', 'cs', 'ko']
 
   def getGoogleResult(self, url):
     res = JSON.ObjectFromURL(url)
