@@ -184,7 +184,7 @@ class TVDBAgent(Agent.TV_Shows):
       if i > 10:
         break
 
-      score = 100
+      score = 90 # Start word matches off at a slight defecit compared to guid matches.
       theYear = result[2]
       
       # Remove year suffixes that can mess things up.
@@ -250,15 +250,23 @@ class TVDBAgent(Agent.TV_Shows):
       # GUID-based matches.
       self.searchByGuid(results, lang, media.show, media.year)
       results.Sort('score', descending=True)
+
+      for i,r in enumerate(results):
+        if i > 2:
+          break
+        Log('Top GUID result: ' + str(results[i]))
+
       if not len(results) or results[0].score <= GOOD_MATCH_THRESHOLD:
         # No good-enough matches in GUID search, try word matches.
         self.searchByWords(results, lang, media.show, media.year)
         self.dedupe(results)
         results.Sort('score', descending=True)
 
-    Log('After GUID/word matching:')
-    for i,r in enumerate(results):
-      Log('Found result: ' + str(results[i]))
+        for i,r in enumerate(results):
+          if i > 2:
+            break
+          Log('Top GUID+name result: ' + str(results[i]))
+
 
     if len(results) == 0:
       doGoogleSearch = True
@@ -377,6 +385,11 @@ class TVDBAgent(Agent.TV_Shows):
       for y in years[:-1]:
         if resultMap[y].score <= resultMap[years[i+1]].score:
           resultMap[y].score = resultMap[years[i+1]].score + 1
+
+      for i,r in enumerate(results):
+        if i > 10:
+          break
+        Log('Final result: ' + str(results[i]))
           
   def TVDBurlParse(self, media, lang, results, score, scorePenalty, url):
     if url.count('tab=series&id='):
