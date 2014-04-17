@@ -121,6 +121,7 @@ class TVDBAgent(Agent.TV_Shows):
     penalty = 0
     maxPercentPenalty = 30
     maxLevPenalty = 10
+    minPercentThreshold = 25
 
     try:
       res = XML.ElementFromURL(TVDB_GUID_SEARCH + guid[0:2] + '/' + guid + '.xml')
@@ -130,16 +131,17 @@ class TVDBAgent(Agent.TV_Shows):
         pct   = int(match.get('percentage'))
         penalty += int(maxPercentPenalty * ((100-pct)/100.0))
 
-        try:
-          xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], guid, lang)))
-          name = xml.xpath('//Data/Series/SeriesName')[0].text
-          penalty += int(maxLevPenalty * (1 - self.lev_ratio(name,title)))
-          try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
-          except: year = None
-          Log('Adding (based on guid lookup) id: %s, name: %s, year: %s, lang: %s, score: %s' % (match.get('guid'),name,year,lang,100-penalty))
-          results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=100-penalty))
-        except:
-          continue
+        if pct > minPercentThreshold:
+          try:
+            xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], guid, lang)))
+            name = xml.xpath('//Data/Series/SeriesName')[0].text
+            penalty += int(maxLevPenalty * (1 - self.lev_ratio(name,title)))
+            try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
+            except: year = None
+            Log('Adding (based on guid lookup) id: %s, name: %s, year: %s, lang: %s, score: %s' % (match.get('guid'),name,year,lang,100-penalty))
+            results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=100-penalty))
+          except:
+            continue
 
     except Exception, e:
       Log(repr(e))
@@ -217,7 +219,8 @@ class TVDBAgent(Agent.TV_Shows):
       # Discout for later results.
       score = score - i * 5
 
-      if score > 0:
+      # Use a relatively high threshold here to avoid pounding TheTVDB with a bunch of bogus stuff that 404's on our proxies.
+      if score > 70:
 
         # Make sure TheTVDB has heard of this show and we'll be able to parse the results.
         try: 
