@@ -55,6 +55,7 @@ THETVDB_LANGUAGES_CODE = {
   'sv': '8',
   'tr': '21',
   'zh': '6',
+  'sl': '30'
 }
 
 GOOD_MATCH_THRESHOLD = 98 # Short circuit once we find a match better than this.
