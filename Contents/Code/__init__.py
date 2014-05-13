@@ -170,6 +170,9 @@ class TVDBAgent(Agent.TV_Shows):
             id = match.get('id')
             title = match.get('title')
             titleYear = match.get('year')
+            # Make sure we use the None type (not the string 'None' which evaluates to true and sorts differently).
+            if titleYear == 'None': 
+              titleYear = None
             
             if not show_map.has_key(id):
               show_map[id] = [id, title, titleYear, 1]
