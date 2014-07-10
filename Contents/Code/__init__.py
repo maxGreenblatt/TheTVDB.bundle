@@ -257,6 +257,8 @@ class TVDBAgent(Agent.TV_Shows):
           score = 100
         ))
 
+      return
+
 
     doGoogleSearch = False
     if manual:
