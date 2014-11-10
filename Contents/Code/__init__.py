@@ -26,8 +26,6 @@ SCRUB_FROM_TITLE_SEARCH_KEYWORDS = ['uk','us']
 NETWORK_IN_TITLE = ['bbc']
 EXTRACT_AS_KEYWORDS = ['uk','us','bbc']
 
-netLock = Thread.Lock()
-
 # Language table
 # NOTE: if you add something here, make sure
 # to add the language to the appropriate 
