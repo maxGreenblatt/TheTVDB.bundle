@@ -1,4 +1,6 @@
 import re, time, unicodedata, hashlib, types
+from urllib2 import HTTPError
+from urllib  import quote
 
 # Define proxy for TVDB.
 TVDB_SITE  = 'thetvdb.com'
@@ -25,6 +27,52 @@ GOOGLE_JSON_IMDB = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rs
 SCRUB_FROM_TITLE_SEARCH_KEYWORDS = ['uk','us']
 NETWORK_IN_TITLE = ['bbc']
 EXTRACT_AS_KEYWORDS = ['uk','us','bbc']
+
+# Extras
+THETVDB_EXTRAS_URL = 'http://meta.plex.tv/tv_e/%s/%s/%s' #'http://127.0.0.1:32400/services/iva/metadata/%s?lang=%s&extras=1'
+IVA_ASSET_URL = 'iva://api.internetvideoarchive.com/2.0/DataService/VideoAssets(%s)?lang=%s&bitrates=%s&duration=%s'
+TYPE_ORDER = ['primary_trailer', 'trailer', 'behind_the_scenes', 'interview', 'scene_or_sample']
+EXTRA_TYPE_MAP = {'primary_trailer' : TrailerObject,
+                  'trailer' : TrailerObject,
+                  'interview' : InterviewObject,
+                  'behind_the_scenes' : BehindTheScenesObject,
+                  'scene_or_sample' : SceneOrSampleObject}
+IVA_LANGUAGES = {-1   : Locale.Language.Unknown,
+                  0   : Locale.Language.English,
+                  12  : Locale.Language.Swedish, 
+                  3   : Locale.Language.French, 
+                  2   : Locale.Language.Spanish, 
+                  32  : Locale.Language.Dutch, 
+                  10  : Locale.Language.German, 
+                  11  : Locale.Language.Italian, 
+                  9   : Locale.Language.Danish, 
+                  26  : Locale.Language.Arabic, 
+                  44  : Locale.Language.Catalan,
+                  8   : Locale.Language.Chinese, 
+                  18  : Locale.Language.Czech,
+                  80  : Locale.Language.Estonian,
+                  33  : Locale.Language.Finnish,
+                  5   : Locale.Language.Greek,
+                  15  : Locale.Language.Hebrew,
+                  36  : Locale.Language.Hindi,
+                  29  : Locale.Language.Hungarian,
+                  276 : Locale.Language.Indonesian,
+                  7   : Locale.Language.Japanese,
+                  13  : Locale.Language.Korean,
+                  324 : Locale.Language.Latvian,
+                  21  : Locale.Language.Norwegian,
+                  24  : Locale.Language.Persian,
+                  40  : Locale.Language.Polish,
+                  17  : Locale.Language.Portuguese,
+                  28  : Locale.Language.Romanian,
+                  4   : Locale.Language.Russian,
+                  105 : Locale.Language.Slovak,
+                  25  : Locale.Language.Thai,
+                  64  : Locale.Language.Turkish,
+                  493 : Locale.Language.Ukrainian,
+                  50  : Locale.Language.Vietnamese}
+
+netLock = Thread.Lock()
 
 # Language table
 # NOTE: if you add something here, make sure
@@ -54,6 +102,21 @@ THETVDB_LANGUAGES_CODE = {
   'tr': '21',
   'zh': '6',
   'sl': '30'
+}
+
+ROMAN_NUMERAL_MAP = {
+    ' i:': ' 1:',
+    ' ii:': ' 2:',
+    ' iii:': ' 3:',
+    ' iv:': ' 4:',
+    ' v:': ' 5:',
+    ' vi:': ' 6:',
+    ' vii:': ' 7:',
+    ' viii:': ' 8:',
+    ' ix:': ' 9:',
+    ' x:': ' 10:',
+    ' xi:': ' 11:',
+    ' xii:': ' 12:',
 }
 
 GOOD_MATCH_THRESHOLD = 98 # Short circuit once we find a match better than this.
@@ -525,11 +588,177 @@ class TVDBAgent(Agent.TV_Shows):
         
     return xml
 
+  def eligibleForExtras(self):
+    # Extras.
+    try: 
+      # Do a quick check to make sure we've got the types available in this framework version, and that the server
+      # is new enough to support the IVA endpoints.
+      t = InterviewObject()
+      if Util.VersionAtLeast(Platform.ServerVersion, 0,9,9,13):
+        find_extras = True
+      else:
+        find_extras = False
+        Log('Not adding extras: Server v0.9.9.13+ required')
+    except NameError, e:
+      Log('Not adding extras: Framework v2.5.0+ required')
+      find_extras = False
+    return find_extras
+
+  """
+  Lovingly borrowed from https://stackoverflow.com/questions/794663/net-convert-number-to-string-representation-1-to-one-2-to-two-etc
+  As instructed by IVA's Normalization Rules, Step 17: http://www.internetvideoarchive.com/documentation/data-integration/iva-data-matching-guidelines/
+  """
+  def number_to_text(self, n):
+     if n < 0:
+        return "Minus " + self.number_to_text(-n)
+     elif n == 0:
+        return ""
+     elif n <= 19:
+        return ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen")[n-1] + " "
+     elif n <= 99:
+        return ("Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety")[n / 10 - 2] + " " + self.number_to_text(n % 10)
+     elif n <= 199:
+        return "One Hundred " + self.number_to_text(n % 100)
+     elif n <= 999:
+        return self.number_to_text(n / 100) + "Hundreds " + self.number_to_text(n % 100)
+     elif n <= 1999:
+        return "One Thousand " + self.number_to_text(n % 1000);
+     elif n <= 999999:
+        return self.number_to_text(n / 1000) + "Thousands " + self.number_to_text(n % 1000)
+     elif n <= 1999999:
+        return "One Million " + self.number_to_text(n % 1000000)
+     elif n <= 999999999:
+        return self.number_to_text(n / 1000000) + "Millions " + self.number_to_text(n % 1000000)
+     elif n <= 1999999999:
+        return "One Billion " + self.number_to_text(n % 1000000000);
+     else:
+        return self.number_to_text(n / 1000000000) + "Billions " + self.number_to_text(n % 1000000000)
+
+  # IVA Normalization rules found here: http://www.internetvideoarchive.com/documentation/data-integration/iva-data-matching-guidelines/
+  def ivaNormalizeTitle(self, title):
+      title = title.strip().upper()
+
+      title = re.sub(r'^(AN |A |THE )|(, AN |, A |, THE)$|\([^\)]+\)$|\{[^\}]+\}$|\[[^\]]+\]$| AN IMAX 3D EXPERIENCE| AN IMAX EXPERIENCE| THE IMAX EXPERIENCE| IMAX 3D EXPERIENCE| IMAX 3D', "", title)
+
+      title = title.lower().replace('&', 'and').strip().upper()
+
+      title = re.sub(r'^(AN |A |THE )|(, AN |, A |, THE)$', "", title)
+
+      title = title.lower()
+
+      title = re.sub(r'( i:| ii:| iii:| iv:| v:| vi:| vii:| viii:| ix:| x:| xi:| xii:)', lambda m: ROMAN_NUMERAL_MAP[m.group(0)], title)
+      
+      title = re.sub(r'[!@#\$%\^\*\_\+=\{\}\[\]\|<>`\:\-\(\)\?/\\\&\~\.\,\'\"]', " ", title)
+
+      title = re.sub(r'\b\d+\b', lambda m: self.number_to_text(int(m.group())).replace('-', ' '), title)
+
+      title = title.lower().strip().replace(',', ' ')
+
+      title = re.sub(r'( i$| ii$| iii$| iv$| v$| vi$| vii$| viii$| ix$| x$| xi$| xii$)', lambda m: ROMAN_NUMERAL_MAP[m.group(0)+":"][:-1], title)
+
+      title = re.sub(r'\b\d+\b', lambda m: self.number_to_text(int(m.group())).replace('-', ' '), title)
+
+      title = title.lower()
+
+      return title.encode('utf-8').strip().replace("  ", " ")
+
+  def processExtras(self, xml, metadata, lang, ivaNormTitle=""):
+    extras = []
+    media_title = None
+    for extra in xml.xpath('//extra'):
+      avail = Datetime.ParseDate(extra.get('originally_available_at'))
+      lang_code = int(extra.get('lang_code')) if extra.get('lang_code') else -1
+      subtitle_lang_code = int(extra.get('subtitle_lang_code')) if extra.get('subtitle_lang_code') else -1
+
+      spoken_lang = IVA_LANGUAGES.get(lang_code) or Locale.Language.Unknown
+      subtitle_lang = IVA_LANGUAGES.get(subtitle_lang_code) or Locale.Language.Unknown
+      include = False
+
+      # Include extras in section language...
+      if spoken_lang == lang:
+        
+        # ...if they have section language subs AND this was explicitly requested in prefs.
+        if Prefs['native_subs'] and subtitle_lang == lang:
+          include = True
+
+        # ...if there are no subs.
+        if subtitle_lang_code == -1:
+          include = True
+
+      # Include foreign language extras if they have subs in the section language.
+      if spoken_lang != lang and subtitle_lang == lang:
+        include = True
+
+      # Always include English language extras anyway (often section lang options are not available), but only if they have no subs.
+      if spoken_lang == Locale.Language.English and subtitle_lang_code == -1:
+        include = True
+
+      # Exclude non-primary trailers and scenes.
+      extra_type = 'primary_trailer' if extra.get('primary') == 'true' else extra.get('type')
+      #if extra_type == 'trailer' or extra_type == 'scene_or_sample':
+      #  include = False
+
+      if include:
+
+        bitrates = extra.get('bitrates') or ''
+        duration = int(extra.get('duration') or 0)
+
+        # Remember the title if this is the primary trailer.
+        if extra_type == 'primary_trailer':
+          media_title = extra.get('title')
+
+        # Add the extra.
+        if extra_type in EXTRA_TYPE_MAP:
+          extras.append({ 'type' : extra_type,
+                          'lang' : spoken_lang,
+                          'extra' : EXTRA_TYPE_MAP[extra_type](url=IVA_ASSET_URL % (extra.get('iva_id'), spoken_lang, bitrates, duration),
+                                                               title=extra.get('title'),
+                                                               year=avail.year,
+                                                               originally_available_at=avail,
+                                                               thumb=extra.get('thumb') or '')})
+        else:
+            Log('Skipping extra %s because type %s was not recognized.' % (extra.get('iva_id'), extra_type))
+
+    # Sort the extras, making sure the primary trailer is first.
+    extras.sort(key=lambda e: TYPE_ORDER.index(e['type']))
+
+    # If red band trailers were requested in prefs, see if we have one and swap it in.
+    if Prefs['redband']:
+      redbands = [t for t in xml.xpath('//extra') if t.get('type') == 'trailer' and re.match(r'.+red.?band.+', t.get('title'), re.IGNORECASE) and IVA_LANGUAGES.get(int(t.get('lang_code') or -1)) == lang]
+      if len(redbands) > 0:
+        extra = redbands[0]
+        extras[0]['extra'].url = IVA_ASSET_URL % (extra.get('iva_id'), lang, extra.get('bitrates') or '', int(extra.get('duration') or 0))
+        extras[0]['extra'].thumb = extra.get('thumb') or ''
+        Log('Adding red band trailer: ' + extra.get('iva_id'))
+
+    # If our primary trailer is in English but the library language is something else, see if we can do better.
+    if lang != Locale.Language.English and extras[0]['lang'] == Locale.Language.English:
+      lang_matches = [t for t in xml.xpath('//extra') if t.get('type') == 'trailer' and IVA_LANGUAGES.get(int(t.get('subtitle_lang_code') or -1)) == lang]
+      lang_matches += [t for t in xml.xpath('//extra') if t.get('type') == 'trailer' and IVA_LANGUAGES.get(int(t.get('lang_code') or -1)) == lang]
+      if len(lang_matches) > 0:
+        extra = lang_matches[0]
+        spoken_lang = IVA_LANGUAGES.get(int(extra.get('lang_code') or -1)) or Locale.Language.Unknown
+        extras[0]['lang'] = spoken_lang
+        extras[0]['extra'].url = IVA_ASSET_URL % (extra.get('iva_id'), spoken_lang, extra.get('bitrates') or '', int(extra.get('duration') or 0))
+        extras[0]['extra'].thumb = extra.get('thumb') or ''
+        Log('Adding trailer with spoken language %s and subtitled langauge %s to match library language.' % (spoken_lang, IVA_LANGUAGES.get(int(extra.get('subtitle_lang_code') or -1)) or Locale.Language.Unknown))
+
+    # Clean up the found extras.
+    extras = [scrub_extra(extra, media_title) for extra in extras]
+
+    # Add them in the right order to the metadata.extras list.
+    for extra in extras:
+      Log(extra['extra'])
+      #metadata.extras.add(extra['extra'])
+
+    Log('%s - Added %d of %d extras.' % (ivaNormTitle, len(extras), len(xml.xpath('//extra'))))
+
   def update(self, metadata, media, lang):
     Log("def update()")
+
     zip_url = TVDB_ZIP_URL % (Dict['ZIP_MIRROR'], metadata.id, lang)
     banner_root = TVDB_BANNER_URL % Dict['IMG_MIRROR']
-    
+
     # Get the show's zipped data
     zip_data = GetResultFromNetwork(zip_url)
     zip_archive = Archive.Zip(zip_data)
@@ -537,7 +766,7 @@ class TVDBAgent(Agent.TV_Shows):
     # Extract the XML files from the archive. Work around corrupt XML.
     root_el = XML.ElementFromString(self.fixBrokenXml(zip_archive[lang+'.xml']))
     actors_el = XML.ElementFromString(self.fixBrokenXml(zip_archive['actors.xml']))
-    banners_el =XML.ElementFromString(self.fixBrokenXml(zip_archive['banners.xml']))
+    banners_el = XML.ElementFromString(self.fixBrokenXml(zip_archive['banners.xml']))
     
     # Close the archive
     del zip_archive
@@ -577,7 +806,21 @@ class TVDBAgent(Agent.TV_Shows):
         role.actor = actor.xpath('./Name')[0].text
       except:
         pass
-    
+
+    if metadata.title is not None and metadata.title is not '' and self.eligibleForExtras() and Prefs['extras']:
+      ivaNormTitle = self.ivaNormalizeTitle(metadata.title)
+
+      try:
+        req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
+        xml = XML.ElementFromURL(req)
+
+        self.processExtras(xml, metadata, lang, ivaNormTitle)
+
+      except HTTPError, e:
+        if e.code == 403:
+          Log('Skipping online extra lookup (an active Plex Pass is required).')
+
+
     # Get episode data
     @parallelize
     def UpdateEpisodes():
@@ -607,7 +850,7 @@ class TVDBAgent(Agent.TV_Shows):
         
         # Create a task for updating this episode
         @task
-        def UpdateEpisode(episode=episode, episode_el=episode_el):        
+        def UpdateEpisode(episode=episode, episode_el=episode_el, lang=lang):        
 
           # Copy attributes from the XML
           episode.title = el_text(episode_el, 'EpisodeName')
@@ -648,6 +891,17 @@ class TVDBAgent(Agent.TV_Shows):
                   pass
                   
           episode.thumbs.validate_keys(valid_names)
+
+          try:
+            req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
+            req = req + '/' + el_text(episode_el, 'SeasonNumber') + '/' + el_text(episode_el, 'EpisodeNumber')
+            xml = XML.ElementFromURL(req)
+
+            self.processExtras(xml, episode, lang, ivaNormTitle)
+
+          except HTTPError, e:
+            if e.code == 403:
+              Log('Skipping online extra lookup (an active Plex Pass is required).')
       
     # Maintain a list of valid image names
     valid_names = list()
@@ -851,3 +1105,21 @@ class TVDBAgent(Agent.TV_Shows):
 
     return (useTitle.get('title'), useTitle.get('lang'), useTitle.get('lev_ratio'))
 
+def scrub_extra(extra, media_title):
+
+  e = extra['extra']
+
+  # Remove the "Movie Title: " from non-trailer extra titles.
+  if media_title is not None:
+    r = re.compile(media_title + ': ', re.IGNORECASE)
+    e.title = r.sub('', e.title)
+
+  # Remove the "Movie Title Scene: " from SceneOrSample extra titles.
+  if media_title is not None:
+    r = re.compile(media_title + ' Scene: ', re.IGNORECASE)
+    e.title = r.sub('', e.title)
+
+  # Capitalise UK correctly.
+  e.title = e.title.replace('Uk', 'UK')
+
+  return extra
