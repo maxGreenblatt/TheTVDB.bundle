@@ -1,6 +1,5 @@
 import re, time, unicodedata, hashlib, types
 from urllib2 import HTTPError
-from urllib  import quote
 
 # Define proxy for TVDB.
 TVDB_SITE  = 'thetvdb.com'
@@ -39,16 +38,16 @@ EXTRA_TYPE_MAP = {'primary_trailer' : TrailerObject,
                   'scene_or_sample' : SceneOrSampleObject}
 IVA_LANGUAGES = {-1   : Locale.Language.Unknown,
                   0   : Locale.Language.English,
-                  12  : Locale.Language.Swedish, 
-                  3   : Locale.Language.French, 
-                  2   : Locale.Language.Spanish, 
-                  32  : Locale.Language.Dutch, 
-                  10  : Locale.Language.German, 
-                  11  : Locale.Language.Italian, 
-                  9   : Locale.Language.Danish, 
-                  26  : Locale.Language.Arabic, 
+                  12  : Locale.Language.Swedish,
+                  3   : Locale.Language.French,
+                  2   : Locale.Language.Spanish,
+                  32  : Locale.Language.Dutch,
+                  10  : Locale.Language.German,
+                  11  : Locale.Language.Italian,
+                  9   : Locale.Language.Danish,
+                  26  : Locale.Language.Arabic,
                   44  : Locale.Language.Catalan,
-                  8   : Locale.Language.Chinese, 
+                  8   : Locale.Language.Chinese,
                   18  : Locale.Language.Czech,
                   80  : Locale.Language.Estonian,
                   33  : Locale.Language.Finnish,
@@ -590,7 +589,7 @@ class TVDBAgent(Agent.TV_Shows):
 
   def eligibleForExtras(self):
     # Extras.
-    try: 
+    try:
       # Do a quick check to make sure we've got the types available in this framework version, and that the server
       # is new enough to support the IVA endpoints.
       t = InterviewObject()
@@ -647,7 +646,7 @@ class TVDBAgent(Agent.TV_Shows):
       title = title.lower()
 
       title = re.sub(r'( i:| ii:| iii:| iv:| v:| vi:| vii:| viii:| ix:| x:| xi:| xii:)', lambda m: ROMAN_NUMERAL_MAP[m.group(0)], title)
-      
+
       title = re.sub(r'[!@#\$%\^\*\_\+=\{\}\[\]\|<>`\:\-\(\)\?/\\\&\~\.\,\'\"]', " ", title)
 
       title = re.sub(r'\b\d+\b', lambda m: self.number_to_text(int(m.group())).replace('-', ' '), title)
@@ -676,7 +675,7 @@ class TVDBAgent(Agent.TV_Shows):
 
       # Include extras in section language...
       if spoken_lang == lang:
-        
+
         # ...if they have section language subs AND this was explicitly requested in prefs.
         if Prefs['native_subs'] and subtitle_lang == lang:
           include = True
@@ -694,9 +693,8 @@ class TVDBAgent(Agent.TV_Shows):
         include = True
 
       # Exclude non-primary trailers and scenes.
+      # TODO: For now there is no primary trailer for TV
       extra_type = 'primary_trailer' if extra.get('primary') == 'true' else extra.get('type')
-      #if extra_type == 'trailer' or extra_type == 'scene_or_sample':
-      #  include = False
 
       if include:
 
@@ -704,6 +702,7 @@ class TVDBAgent(Agent.TV_Shows):
         duration = int(extra.get('duration') or 0)
 
         # Remember the title if this is the primary trailer.
+        # TODO: For now there is no primary trailer for TV
         if extra_type == 'primary_trailer':
           media_title = extra.get('title')
 
@@ -722,15 +721,6 @@ class TVDBAgent(Agent.TV_Shows):
     # Sort the extras, making sure the primary trailer is first.
     extras.sort(key=lambda e: TYPE_ORDER.index(e['type']))
 
-    # If red band trailers were requested in prefs, see if we have one and swap it in.
-    if Prefs['redband']:
-      redbands = [t for t in xml.xpath('//extra') if t.get('type') == 'trailer' and re.match(r'.+red.?band.+', t.get('title'), re.IGNORECASE) and IVA_LANGUAGES.get(int(t.get('lang_code') or -1)) == lang]
-      if len(redbands) > 0:
-        extra = redbands[0]
-        extras[0]['extra'].url = IVA_ASSET_URL % (extra.get('iva_id'), lang, extra.get('bitrates') or '', int(extra.get('duration') or 0))
-        extras[0]['extra'].thumb = extra.get('thumb') or ''
-        Log('Adding red band trailer: ' + extra.get('iva_id'))
-
     # If our primary trailer is in English but the library language is something else, see if we can do better.
     if lang != Locale.Language.English and extras[0]['lang'] == Locale.Language.English:
       lang_matches = [t for t in xml.xpath('//extra') if t.get('type') == 'trailer' and IVA_LANGUAGES.get(int(t.get('subtitle_lang_code') or -1)) == lang]
@@ -748,6 +738,7 @@ class TVDBAgent(Agent.TV_Shows):
 
     # Add them in the right order to the metadata.extras list.
     for extra in extras:
+      # TODO: Do more than just log the extras once the objects have been
       Log(extra['extra'])
       #metadata.extras.add(extra['extra'])
 
@@ -850,7 +841,7 @@ class TVDBAgent(Agent.TV_Shows):
         
         # Create a task for updating this episode
         @task
-        def UpdateEpisode(episode=episode, episode_el=episode_el, lang=lang):        
+        def UpdateEpisode(episode=episode, episode_el=episode_el, lang=lang):
 
           # Copy attributes from the XML
           episode.title = el_text(episode_el, 'EpisodeName')
@@ -984,7 +975,20 @@ class TVDBAgent(Agent.TV_Shows):
     metadata.posters.validate_keys(valid_names)
     metadata.art.validate_keys(valid_names)
     metadata.banners.validate_keys(valid_names)
-      
+
+    # Grab season level extras
+    for season_num in metadata.seasons:
+      try:
+        req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
+        req = req + '/' + season_num
+        xml = XML.ElementFromURL(req)
+
+        self.processExtras(xml, metadata.seasons[season_num], lang, ivaNormTitle)
+
+      except HTTPError, e:
+        if e.code == 403:
+          Log('Skipping online extra lookup (an active Plex Pass is required).')
+
   def parse_banner(self, banner_el):
     el_text = lambda element, xp: element.xpath(xp)[0].text if element.xpath(xp)[0].text else '' 
 
