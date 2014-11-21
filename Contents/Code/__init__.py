@@ -28,7 +28,7 @@ NETWORK_IN_TITLE = ['bbc']
 EXTRACT_AS_KEYWORDS = ['uk','us','bbc']
 
 # Extras
-THETVDB_EXTRAS_URL = 'http://meta.plex.tv/tv_e/%s/%s/%s' #'http://127.0.0.1:32400/services/iva/metadata/%s?lang=%s&extras=1'
+THETVDB_EXTRAS_URL = 'http://meta.plex.tv/tv_e/%s/%s/%s'
 IVA_ASSET_URL = 'iva://api.internetvideoarchive.com/2.0/DataService/VideoAssets(%s)?lang=%s&bitrates=%s&duration=%s'
 TYPE_ORDER = ['primary_trailer', 'trailer', 'behind_the_scenes', 'interview', 'scene_or_sample']
 EXTRA_TYPE_MAP = {'primary_trailer' : TrailerObject,
@@ -841,7 +841,7 @@ class TVDBAgent(Agent.TV_Shows):
         
         # Create a task for updating this episode
         @task
-        def UpdateEpisode(episode=episode, episode_el=episode_el, lang=lang):
+        def UpdateEpisode(episode=episode, episode_el=episode_el, lang=lang, series_available=metadata.originally_available_at, series_id=metadata.id):
 
           # Copy attributes from the XML
           episode.title = el_text(episode_el, 'EpisodeName')
@@ -884,7 +884,7 @@ class TVDBAgent(Agent.TV_Shows):
           episode.thumbs.validate_keys(valid_names)
 
           try:
-            req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
+            req = THETVDB_EXTRAS_URL % (series_id, ivaNormTitle.replace(' ', '+'), -1 if series_available is None else series_available.year)
             req = req + '/' + el_text(episode_el, 'SeasonNumber') + '/' + el_text(episode_el, 'EpisodeNumber')
             xml = XML.ElementFromURL(req)
 
