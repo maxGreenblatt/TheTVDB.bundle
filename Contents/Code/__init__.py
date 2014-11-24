@@ -1,5 +1,4 @@
 import re, time, unicodedata, hashlib, types
-from urllib2 import HTTPError
 
 # Define proxy for TVDB.
 TVDB_SITE  = 'thetvdb.com'
@@ -807,7 +806,7 @@ class TVDBAgent(Agent.TV_Shows):
 
         self.processExtras(xml, metadata, lang, ivaNormTitle)
 
-      except HTTPError, e:
+      except Ex.HTTPError, e:
         if e.code == 403:
           Log('Skipping online extra lookup (an active Plex Pass is required).')
 
@@ -890,7 +889,7 @@ class TVDBAgent(Agent.TV_Shows):
 
             self.processExtras(xml, episode, lang, ivaNormTitle)
 
-          except HTTPError, e:
+          except Ex.HTTPError, e:
             if e.code == 403:
               Log('Skipping online extra lookup (an active Plex Pass is required).')
       
@@ -985,7 +984,7 @@ class TVDBAgent(Agent.TV_Shows):
 
         self.processExtras(xml, metadata.seasons[season_num], lang, ivaNormTitle)
 
-      except HTTPError, e:
+      except Ex.HTTPError, e:
         if e.code == 403:
           Log('Skipping online extra lookup (an active Plex Pass is required).')
 
