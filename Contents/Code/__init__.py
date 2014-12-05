@@ -607,63 +607,73 @@ class TVDBAgent(Agent.TV_Shows):
   As instructed by IVA's Normalization Rules, Step 17: http://www.internetvideoarchive.com/documentation/data-integration/iva-data-matching-guidelines/
   """
   def number_to_text(self, n):
-     if n < 0:
-        return "Minus " + self.number_to_text(-n)
-     elif n == 0:
-        return ""
-     elif n <= 19:
-        return ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen")[n-1] + " "
-     elif n <= 99:
-        return ("Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety")[n / 10 - 2] + " " + self.number_to_text(n % 10)
-     elif n <= 199:
-        return "One Hundred " + self.number_to_text(n % 100)
-     elif n <= 999:
-        return self.number_to_text(n / 100) + "Hundreds " + self.number_to_text(n % 100)
-     elif n <= 1999:
-        return "One Thousand " + self.number_to_text(n % 1000);
-     elif n <= 999999:
-        return self.number_to_text(n / 1000) + "Thousands " + self.number_to_text(n % 1000)
-     elif n <= 1999999:
-        return "One Million " + self.number_to_text(n % 1000000)
-     elif n <= 999999999:
-        return self.number_to_text(n / 1000000) + "Millions " + self.number_to_text(n % 1000000)
-     elif n <= 1999999999:
-        return "One Billion " + self.number_to_text(n % 1000000000);
-     else:
-        return self.number_to_text(n / 1000000000) + "Billions " + self.number_to_text(n % 1000000000)
+    if n < 0:
+       return "Minus " + self.number_to_text(-n)
+    elif n == 0:
+       return ""
+    elif n <= 19:
+       return ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen")[n-1] + " "
+    elif n <= 99:
+       return ("Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety")[n / 10 - 2] + " " + self.number_to_text(n % 10)
+    elif n <= 199:
+       return "One Hundred " + self.number_to_text(n % 100)
+    elif n <= 999:
+       return self.number_to_text(n / 100) + "Hundred " + self.number_to_text(n % 100)
+    elif n <= 1999:
+       return "One Thousand " + self.number_to_text(n % 1000);
+    elif n <= 999999:
+       return self.number_to_text(n / 1000) + "Thousand " + self.number_to_text(n % 1000)
+    elif n <= 1999999:
+       return "One Million " + self.number_to_text(n % 1000000)
+    elif n <= 999999999:
+       return self.number_to_text(n / 1000000) + "Million " + self.number_to_text(n % 1000000)
+    elif n <= 1999999999:
+       return "One Billion " + self.number_to_text(n % 1000000000);
+    else:
+       return self.number_to_text(n / 1000000000) + "Billion " + self.number_to_text(n % 1000000000)
 
   # IVA Normalization rules found here: http://www.internetvideoarchive.com/documentation/data-integration/iva-data-matching-guidelines/
   def ivaNormalizeTitle(self, title):
-      title = title.strip().upper()
+    if not isinstance(title, basestring):
+      return ""
 
-      title = re.sub(r'^(AN |A |THE )|(, AN |, A |, THE)$|\([^\)]+\)$|\{[^\}]+\}$|\[[^\]]+\]$| AN IMAX 3D EXPERIENCE| AN IMAX EXPERIENCE| THE IMAX EXPERIENCE| IMAX 3D EXPERIENCE| IMAX 3D', "", title)
+    title = title.strip().upper()
 
-      title = title.lower().replace('&', 'and').strip().upper()
+    title = re.sub(r'^(AN |A |THE )|(, AN |, A |, THE)$|\([^\)]+\)$|\{[^\}]+\}$|\[[^\]]+\]$| AN IMAX 3D EXPERIENCE| AN IMAX EXPERIENCE| THE IMAX EXPERIENCE| IMAX 3D EXPERIENCE| IMAX 3D', "", title)
 
-      title = re.sub(r'^(AN |A |THE )|(, AN |, A |, THE)$', "", title)
+    title = title.lower().replace('&', 'and').strip().upper()
 
-      title = title.lower()
+    title = re.sub(r'^(AN |A |THE )|(, AN |, A |, THE)$', "", title)
 
-      title = re.sub(r'( i:| ii:| iii:| iv:| v:| vi:| vii:| viii:| ix:| x:| xi:| xii:)', lambda m: ROMAN_NUMERAL_MAP[m.group(0)], title)
+    title = title.lower()
 
-      title = re.sub(r'[!@#\$%\^\*\_\+=\{\}\[\]\|<>`\:\-\(\)\?/\\\&\~\.\,\'\"]', " ", title)
+    title = re.sub(r'( i:| ii:| iii:| iv:| v:| vi:| vii:| viii:| ix:| x:| xi:| xii:)', lambda m: ROMAN_NUMERAL_MAP[m.group(0)], title)
 
-      title = re.sub(r'\b\d+\b', lambda m: self.number_to_text(int(m.group())).replace('-', ' '), title)
+    title = re.sub(r'[!@#\$%\^\*\_\+=\{\}\[\]\|<>`\:\-\(\)\?/\\\&\~\.\,\'\"]', " ", title)
 
-      title = title.lower().strip().replace(',', ' ')
+    title = re.sub(r'\b\d+\b', lambda m: self.number_to_text(int(m.group())).replace('-', ' '), title)
 
-      title = re.sub(r'( i$| ii$| iii$| iv$| v$| vi$| vii$| viii$| ix$| x$| xi$| xii$)', lambda m: ROMAN_NUMERAL_MAP[m.group(0)+":"][:-1], title)
+    title = title.lower().strip().replace(',', ' ')
 
-      title = re.sub(r'\b\d+\b', lambda m: self.number_to_text(int(m.group())).replace('-', ' '), title)
+    title = re.sub(r'( i$| ii$| iii$| iv$| v$| vi$| vii$| viii$| ix$| x$| xi$| xii$)', lambda m: ROMAN_NUMERAL_MAP[m.group(0)+":"][:-1], title)
 
-      title = title.lower()
+    title = re.sub(r'\b\d+\b', lambda m: self.number_to_text(int(m.group())).replace('-', ' '), title)
 
-      return title.encode('utf-8').strip().replace("  ", " ")
+    title = title.lower()
+
+    normalized = unicodedata.normalize('NFKD', title)
+    corrected = ''
+    for i in range(len(normalized)):
+      if not unicodedata.combining(normalized[i]):
+        corrected += normalized[i]
+    title = corrected
+
+    return title.encode('utf-8').strip().replace("  ", " ")
 
   def processExtras(self, xml, metadata, lang, ivaNormTitle=""):
     extras = []
     media_title = None
-    for extra in xml.xpath('//extra'):
+    for extra in xml.xpath('./extra'):
       avail = Datetime.ParseDate(extra.get('originally_available_at'))
       lang_code = int(extra.get('lang_code')) if extra.get('lang_code') else -1
       subtitle_lang_code = int(extra.get('subtitle_lang_code')) if extra.get('subtitle_lang_code') else -1
@@ -692,7 +702,6 @@ class TVDBAgent(Agent.TV_Shows):
         include = True
 
       # Exclude non-primary trailers and scenes.
-      # TODO: For now there is no primary trailer for TV
       extra_type = 'primary_trailer' if extra.get('primary') == 'true' else extra.get('type')
 
       if include:
@@ -701,7 +710,6 @@ class TVDBAgent(Agent.TV_Shows):
         duration = int(extra.get('duration') or 0)
 
         # Remember the title if this is the primary trailer.
-        # TODO: For now there is no primary trailer for TV
         if extra_type == 'primary_trailer':
           media_title = extra.get('title')
 
@@ -741,7 +749,7 @@ class TVDBAgent(Agent.TV_Shows):
       Log(extra['extra'])
       #metadata.extras.add(extra['extra'])
 
-    Log('%s - Added %d of %d extras.' % (ivaNormTitle, len(extras), len(xml.xpath('//extra'))))
+    Log('%s - Added %d of %d extras.' % (ivaNormTitle, len(extras), len(xml.xpath('./extra'))))
 
   def update(self, metadata, media, lang):
     Log("def update()")
@@ -797,18 +805,19 @@ class TVDBAgent(Agent.TV_Shows):
       except:
         pass
 
-    if metadata.title is not None and metadata.title is not '' and self.eligibleForExtras() and Prefs['extras']:
+    series_extra_xml = None
+    if metadata.title is not None and metadata.title is not '' and metadata.id is not None and metadata.id is not '' and self.eligibleForExtras() and Prefs['extras']:
       ivaNormTitle = self.ivaNormalizeTitle(metadata.title)
+      if len(ivaNormTitle) > 0:
+        try:
+          req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
+          series_extra_xml = XML.ElementFromURL(req)
 
-      try:
-        req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
-        xml = XML.ElementFromURL(req)
+          self.processExtras(series_extra_xml, metadata, lang, ivaNormTitle)
 
-        self.processExtras(xml, metadata, lang, ivaNormTitle)
-
-      except Ex.HTTPError, e:
-        if e.code == 403:
-          Log('Skipping online extra lookup (an active Plex Pass is required).')
+        except Ex.HTTPError, e:
+          if e.code == 403:
+            Log('Skipping online extra lookup (an active Plex Pass is required).')
 
 
     # Get episode data
@@ -840,7 +849,7 @@ class TVDBAgent(Agent.TV_Shows):
         
         # Create a task for updating this episode
         @task
-        def UpdateEpisode(episode=episode, episode_el=episode_el, lang=lang, series_available=metadata.originally_available_at, series_id=metadata.id):
+        def UpdateEpisode(episode=episode, episode_el=episode_el, lang=lang, series_available=metadata.originally_available_at, series_id=metadata.id, ivaNormTitle=ivaNormTitle, series_extra_xml=series_extra_xml):
 
           # Copy attributes from the XML
           episode.title = el_text(episode_el, 'EpisodeName')
@@ -883,11 +892,15 @@ class TVDBAgent(Agent.TV_Shows):
           episode.thumbs.validate_keys(valid_names)
 
           try:
-            req = THETVDB_EXTRAS_URL % (series_id, ivaNormTitle.replace(' ', '+'), -1 if series_available is None else series_available.year)
-            req = req + '/' + el_text(episode_el, 'SeasonNumber') + '/' + el_text(episode_el, 'EpisodeNumber')
-            xml = XML.ElementFromURL(req)
+            episode_extra_xml = series_extra_xml.xpath('./related_extras/season_%s/related_extras/episode_%s' % (el_text(episode_el, 'SeasonNumber'), el_text(episode_el, 'EpisodeNumber')))
+            if len(episode_extra_xml):
+              self.processExtras(episode_extra_xml[0], episode, lang, ivaNormTitle)
+            elif len(ivaNormTitle) > 0 and series_id is not None and series_id is not "":
+              req = THETVDB_EXTRAS_URL % (series_id, ivaNormTitle.replace(' ', '+'), -1 if series_available is None else series_available.year)
+              req = req + '/' + el_text(episode_el, 'SeasonNumber') + '/' + el_text(episode_el, 'EpisodeNumber')
+              xml = XML.ElementFromURL(req)
 
-            self.processExtras(xml, episode, lang, ivaNormTitle)
+              self.processExtras(xml, episode, lang, ivaNormTitle)
 
           except Ex.HTTPError, e:
             if e.code == 403:
@@ -978,11 +991,15 @@ class TVDBAgent(Agent.TV_Shows):
     # Grab season level extras
     for season_num in metadata.seasons:
       try:
-        req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
-        req = req + '/' + season_num
-        xml = XML.ElementFromURL(req)
+        season_extra_xml = series_extra_xml.xpath('./related_extras/season_%s' % season_num)
+        if len(season_extra_xml):
+              self.processExtras(season_extra_xml[0], metadata.seasons[season_num], lang, ivaNormTitle)
+        elif len(ivaNormTitle) > 0 and metadata.id is not None and metadata.id is not "":
+          req = THETVDB_EXTRAS_URL % (metadata.id, ivaNormTitle.replace(' ', '+'), -1 if metadata.originally_available_at is None else metadata.originally_available_at.year)
+          req = req + '/' + season_num
+          xml = XML.ElementFromURL(req)
 
-        self.processExtras(xml, metadata.seasons[season_num], lang, ivaNormTitle)
+          self.processExtras(xml, metadata.seasons[season_num], lang, ivaNormTitle)
 
       except Ex.HTTPError, e:
         if e.code == 403:
